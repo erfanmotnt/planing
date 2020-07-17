@@ -5,16 +5,16 @@ from datetime import timedelta, time, datetime
 from django.utils import timezone
 from dateutil.relativedelta import relativedelta
 
-PERIODS = (
-        ('n', 'None'),
-        ('d', 'today'),
-        ('w', 'this week'),
-        ('m', 'this month'),
-        ('y', 'this year')
-    )
 
 class TaskForm(forms.ModelForm):
     
+    PERIODS = (
+        ('n', 'None'),
+        ('d', 'daily'),
+        ('w', 'weekly'),
+        ('m', 'monthly'),
+        ('y', 'yearly')
+    )
     period = forms.ChoiceField(choices=PERIODS)
     
 def periodToRelativedelta(period):
@@ -42,8 +42,14 @@ class WorkingTimeSetFilter(admin.SimpleListFilter):
     parameter_name = 'working_time'
 
     def lookups(self, request, model_admin):
-        return  PERIODS
-
+        return (
+            ('n', 'None'),
+            ('d', 'today'),
+            ('w', 'this week'),
+            ('m', 'this month'),
+            ('y', 'this year')
+        )
+    
     def queryset(self, request, queryset):
         if self.value() is None:
             return queryset
@@ -61,12 +67,15 @@ class TaskAdmin(admin.ModelAdmin):
         form = super(TaskAdmin, self).get_form(request, obj, **kwargs)
         if obj is not None:
             self.task_last_name = obj.name
-        form.base_fields['start_time'].initial = timezone.now()
-        form.base_fields['time_needed'].initial = time(0, 15, 0)
+        else:
+            form.base_fields['start_time'].initial = timezone.now()
+            form.base_fields['end_time'].initial = timezone.now()   
+            form.base_fields['working_time'].initial = timezone.now()
+            form.base_fields['time_needed'].initial = time(0, 15, 0)
         return form
 
     def save_model(self, request, obj, form, change):    
-        if not change:
+        if not change and obj.period != 'n':
             while obj.working_time < obj.end_time:
                 obj.save()
                 obj = getNext(obj)
@@ -89,6 +98,7 @@ class TaskAdmin(admin.ModelAdmin):
                 q.pk = pktmp
                 q.working_time = wttmp
                 q.is_done = donetmp
+                q.multi_change = False
                 q.save()
         else:
             obj.save()

@@ -7,33 +7,17 @@ from dateutil.relativedelta import relativedelta
 
 PERIODS = (
         ('n', 'None'),
-        ('d', 'Daily'),
-        ('w', 'Weekly'),
-        ('m', 'Monthly'),
-        ('y', 'Yearly')
+        ('d', 'today'),
+        ('w', 'this week'),
+        ('m', 'this month'),
+        ('y', 'this year')
     )
 
 class TaskForm(forms.ModelForm):
     
     period = forms.ChoiceField(choices=PERIODS)
     
-class WorkingTimeSetFilter(admin.SimpleListFilter):
-    title = 'working_time_set'
-    parameter_name = 'working_time'
-
-    def lookups(self, request, model_admin):
-        return  PERIODS
-
-
-    def queryset(self, request, queryset):
-        value = self.value()
-        ###
-
-        
-def getNext(obj):
-    outObj = obj
-    outObj.pk = None
-    period = obj.period
+def periodToRelativedelta(period):
     relativedeltaTime = relativedelta()
     if period is 'n':   
         relativedeltaTime = relativedelta()
@@ -45,14 +29,33 @@ def getNext(obj):
         relativedeltaTime = relativedelta(months=1)
     elif period is 'y':
         relativedeltaTime = relativedelta(years=1)
+    return relativedeltaTime
 
-    outObj.working_time = outObj.working_time + relativedeltaTime
+def getNext(obj):
+    outObj = obj
+    outObj.pk = None
+    outObj.working_time = outObj.working_time + periodToRelativedelta(obj.period)
     return outObj
 
+class WorkingTimeSetFilter(admin.SimpleListFilter):
+    title = 'working_time_set'
+    parameter_name = 'working_time'
+
+    def lookups(self, request, model_admin):
+        return  PERIODS
+
+    def queryset(self, request, queryset):
+        if self.value() is None:
+            return queryset
+        relativedeltaTime = periodToRelativedelta(self.value())
+        queryset = queryset.filter(working_time__lte= timezone.now() + relativedeltaTime)
+        queryset = queryset.filter(working_time__gte= timezone.now() - relativedelta(hours=12))
+        return queryset
+        
 
 class TaskAdmin(admin.ModelAdmin):
     form = TaskForm
-    list_display = ('name', 'working_time', 'time_needed')
+    list_display = ('name', 'working_time', 'time_needed', 'is_done')
     list_filter = [WorkingTimeSetFilter, 'name']
     def get_form(self, request, obj=None, **kwargs):
         form = super(TaskAdmin, self).get_form(request, obj, **kwargs)
@@ -67,7 +70,7 @@ class TaskAdmin(admin.ModelAdmin):
             while obj.working_time < obj.end_time:
                 obj.save()
                 obj = getNext(obj)
-        else:
+        elif obj.multi_change:
             querys = Task.objects.all().filter(name=self.task_last_name)
             querys = querys.filter(working_time__gte=obj.working_time)
             for q in querys:
@@ -81,9 +84,13 @@ class TaskAdmin(admin.ModelAdmin):
                 )
                 
                 pktmp = q.pk
+                donetmp = q.is_done
                 q = obj
                 q.pk = pktmp
                 q.working_time = wttmp
+                q.is_done = donetmp
                 q.save()
+        else:
+            obj.save()
 
 admin.site.register(Task, TaskAdmin)

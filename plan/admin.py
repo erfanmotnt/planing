@@ -36,14 +36,12 @@ def getNext(obj):
     outObj.pk = None
     outObj.working_time = outObj.working_time + periodToRelativedelta(obj.period)
     return outObj
-
 class WorkingTimeSetFilter(admin.SimpleListFilter):
     title = 'working_time_set'
     parameter_name = 'working_time'
 
     def lookups(self, request, model_admin):
         return (
-            ('n', 'None'),
             ('d', 'today'),
             ('w', 'this week'),
             ('m', 'this month'),
@@ -54,8 +52,23 @@ class WorkingTimeSetFilter(admin.SimpleListFilter):
         if self.value() is None:
             return queryset
         relativedeltaTime = periodToRelativedelta(self.value())
-        queryset = queryset.filter(working_time__lte= timezone.now() + relativedeltaTime)
-        queryset = queryset.filter(working_time__gte= timezone.now() - relativedelta(hours=12))
+        queryset = queryset.filter(working_time__lte= datetime(
+                    timezone.now().year,
+                    timezone.now().month,
+                    timezone.now().day,
+                    0,
+                    0,
+                    0
+                ) + relativedeltaTime )
+        queryset = queryset.filter(working_time__gte= datetime(
+                    timezone.now().year,
+                    timezone.now().month,
+                    timezone.now().day,
+                    0,
+                    0,
+                    0
+                ) )
+        queryset = queryset.order_by('working_time')
         return queryset
         
 
@@ -63,14 +76,29 @@ class TaskAdmin(admin.ModelAdmin):
     form = TaskForm
     list_display = ('name', 'working_time', 'time_needed_todo', 'is_done')
     list_filter = [WorkingTimeSetFilter, 'name']
+
     def get_form(self, request, obj=None, **kwargs):
         form = super(TaskAdmin, self).get_form(request, obj, **kwargs)
         if obj is not None:
             self.task_last_name = obj.name
         else:
-            form.base_fields['start_time'].initial = timezone.now()
-            form.base_fields['end_time'].initial = timezone.now() + relativedelta(hours=24)
-            form.base_fields['working_time'].initial = timezone.now() + relativedelta(hours=1)
+            form.base_fields['start_time'].initial = datetime(
+                    timezone.now().year,
+                    timezone.now().month,
+                    timezone.now().day,
+                    0,
+                    0,
+                    0
+                )
+            form.base_fields['end_time'].initial = datetime(
+                    timezone.now().year,
+                    timezone.now().month,
+                    timezone.now().day,
+                    0,
+                    0,
+                    0
+                ) + relativedelta(days=1)
+            form.base_fields['working_time'].initial = timezone.now()
             form.base_fields['time_needed'].initial = time(0, 15, 0)
         return form
 
@@ -80,6 +108,7 @@ class TaskAdmin(admin.ModelAdmin):
                 obj.save()
                 obj = getNext(obj)
         elif obj.multi_change:
+            obj.save()
             querys = Task.objects.all().filter(name=self.task_last_name)
             querys = querys.filter(working_time__gte=obj.working_time)
             for q in querys:

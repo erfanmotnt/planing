@@ -4,7 +4,7 @@ from .models import Task
 from datetime import timedelta, time, datetime
 from django.utils import timezone
 from dateutil.relativedelta import relativedelta
-#ok
+
 
 class TaskForm(forms.ModelForm):
     
@@ -61,7 +61,7 @@ class WorkingTimeSetFilter(admin.SimpleListFilter):
 
 class TaskAdmin(admin.ModelAdmin):
     form = TaskForm
-    list_display = ('name', 'working_time', 'time_needed', 'is_done')
+    list_display = ('name', 'working_time', 'time_needed_todo', 'is_done')
     list_filter = [WorkingTimeSetFilter, 'name']
     def get_form(self, request, obj=None, **kwargs):
         form = super(TaskAdmin, self).get_form(request, obj, **kwargs)
@@ -69,8 +69,8 @@ class TaskAdmin(admin.ModelAdmin):
             self.task_last_name = obj.name
         else:
             form.base_fields['start_time'].initial = timezone.now()
-            form.base_fields['end_time'].initial = timezone.now()   
-            form.base_fields['working_time'].initial = timezone.now()
+            form.base_fields['end_time'].initial = timezone.now() + relativedelta(hours=24)
+            form.base_fields['working_time'].initial = timezone.now() + relativedelta(hours=1)
             form.base_fields['time_needed'].initial = time(0, 15, 0)
         return form
 
@@ -102,5 +102,7 @@ class TaskAdmin(admin.ModelAdmin):
                 q.save()
         else:
             obj.save()
+
+
 
 admin.site.register(Task, TaskAdmin)

@@ -13,3 +13,6 @@ class Task(models.Model):
 
     def __str__(self):
         return self.name
+
+    def time_needed_todo(self):
+        return self.time_needed.strftime("%H:%M:%S")

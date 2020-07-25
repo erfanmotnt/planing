@@ -18,23 +18,26 @@ class TaskForm(forms.ModelForm):
     period = forms.ChoiceField(choices=PERIODS)
     
 def periodToRelativedelta(period):
-    relativedeltaTime = relativedelta()
-    if period is 'n':   
-        relativedeltaTime = relativedelta()
-    elif period is 'd':
-        relativedeltaTime = relativedelta(days=1)
-    elif period is 'w':
-        relativedeltaTime = relativedelta(weeks=1)
-    elif period is 'm':
-        relativedeltaTime = relativedelta(months=1)
-    elif period is 'y':
-        relativedeltaTime = relativedelta(years=1)
-    return relativedeltaTime
+    relativedeltaStartTime = relativedelta()
+    relativedeltaEndTime = relativedelta()
+    if period == 'lw':
+        relativedeltaStartTime = relativedelta(weeks=-1)
+    elif period == 'yd':
+        relativedeltaStartTime = relativedelta(days=-1)
+    elif period == 'd':
+        relativedeltaEndTime = relativedelta(days=1)
+    elif period == 'w':
+        relativedeltaEndTime = relativedelta(weeks=1)
+    elif period == 'm':
+        relativedeltaEndTime = relativedelta(months=1)
+    elif period == 'y':
+        relativedeltaEndTime = relativedelta(years=1)
+    return relativedeltaStartTime, relativedeltaEndTime
 
 def getNext(obj):
     outObj = obj
     outObj.pk = None
-    outObj.working_time = outObj.working_time + periodToRelativedelta(obj.period)
+    outObj.working_time = outObj.working_time + periodToRelativedelta(obj.period)[1]
     return outObj
 class WorkingTimeSetFilter(admin.SimpleListFilter):
     title = 'working_time_set'
@@ -42,6 +45,8 @@ class WorkingTimeSetFilter(admin.SimpleListFilter):
 
     def lookups(self, request, model_admin):
         return (
+            ('lw', 'last week'),
+            ('yd', 'yesterday'),
             ('d', 'today'),
             ('w', 'this week'),
             ('m', 'this month'),
@@ -51,23 +56,26 @@ class WorkingTimeSetFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset):
         if self.value() is None:
             return queryset
-        relativedeltaTime = periodToRelativedelta(self.value())
-        queryset = queryset.filter(working_time__lte= datetime(
+        relativedeltaStartTime, relativedeltaEndTime = periodToRelativedelta(self.value())
+        startDay = datetime(
                     timezone.now().year,
                     timezone.now().month,
                     timezone.now().day,
                     0,
                     0,
                     0
-                ) + relativedeltaTime )
-        queryset = queryset.filter(working_time__gte= datetime(
+                ) + relativedeltaStartTime
+        endDay = datetime(
                     timezone.now().year,
                     timezone.now().month,
                     timezone.now().day,
                     0,
                     0,
                     0
-                ) )
+                ) + relativedeltaEndTime
+        print(startDay.day, endDay.day, "!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        queryset = queryset.filter(working_time__lte=endDay)
+        queryset = queryset.filter(working_time__gte=startDay)
         queryset = queryset.order_by('working_time')
         return queryset
         

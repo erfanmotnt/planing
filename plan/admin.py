@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django import forms
-from .models import Task
+from .models import Task, Punishment
 from datetime import timedelta, time, datetime
 from django.utils import timezone
 from dateutil.relativedelta import relativedelta
@@ -89,6 +89,7 @@ class TaskAdmin(admin.ModelAdmin):
         form = super(TaskAdmin, self).get_form(request, obj, **kwargs)
         if obj is not None:
             self.task_last_name = obj.name
+            self.task_last_cost = obj.cost_of_delay*obj.delay
         else:
             form.base_fields['start_time'].initial = datetime(
                     timezone.now().year,
@@ -131,15 +132,24 @@ class TaskAdmin(admin.ModelAdmin):
                 
                 pktmp = q.pk
                 donetmp = q.is_done
+                delaytmp = q.delay
                 q = obj
                 q.pk = pktmp
                 q.working_time = wttmp
                 q.is_done = donetmp
+                q.delay = delaytmp
                 q.multi_change = False
                 q.save()
         else:
             obj.save()
+        
+        obj.punishment.to_do_number = obj.punishment.to_do_number - \
+            (self.task_last_cost if self.task_last_cost else 0) + \
+            obj.delay*obj.cost_of_delay
+        obj.punishment.save()
 
-
+class PunishmentAdmin(admin.ModelAdmin):
+    list_display = ('name', 'need_to_do')
 
 admin.site.register(Task, TaskAdmin)
+admin.site.register(Punishment, PunishmentAdmin)

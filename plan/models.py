@@ -3,6 +3,7 @@ from django.db import models
 class Task(models.Model):
     name = models.CharField(max_length=50)
     is_done = models.BooleanField(default=False)
+    delay = models.TimeField("time needed", null = True)
     period = models.CharField(max_length=1, default='n')
     multi_change = models.BooleanField(default=False)
     time_needed = models.TimeField("time needed", null = True)
